@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat P2P</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f4f4f4; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 800px; }
+        .panel { border: 1px solid #ccc; background-color: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        #messages { list-style-type: none; padding: 0; margin: 0 0 20px 0; height: 400px; overflow-y: scroll; border: 1px solid #eee; padding: 10px; }
+        #messages li { padding: 8px 12px; margin-bottom: 5px; border-radius: 5px; background-color: #e9e9e9; word-wrap: break-word; }
+        .form-group { display: flex; gap: 10px; }
+        .form-group input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .form-group button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 5px; cursor: pointer; }
+        .form-group button:hover { background-color: #0056b3; }
+        fieldset { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        legend { font-weight: bold; color: #555; }
+
+        /* ALTERAÇÃO: Adicionado estilo para os painéis de feedback (Flash Messages) */
+        .feedback-panel {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .feedback-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel">
+        <fieldset>
+            <legend>Conectar a um Novo Peer</legend>
+            <form th:action="@{/connect}" method="post" class="form-group">
+                <input type="text" name="host" placeholder="Endereço IP (host)" required />
+                <input type="text" name="port" placeholder="Porta" required />
+                <button type="submit">Conectar</button>
+            </form>
+        </fieldset>
+    </div>
+
+    <div class="panel">
+        <fieldset>
+            <legend>Chat P2P</legend>
+
+            <div th:if="${feedbackMessage}"
+                 th:text="${feedbackMessage}"
+                 th:classappend="${feedbackType == 'success' ? 'feedback-success' : 'feedback-error'}"
+                 class="feedback-panel">
+            </div>
+
+            <ul id="messages">
+                <li th:each="msg : ${messages}" th:text="${msg}"></li>
+            </ul>
+            <form id="message-form" th:action="@{/send}" method="post" class="form-group">
+                <input type="text" id="message-input" name="message" placeholder="Digite sua mensagem..." autocomplete="off" autofocus/>
+                <button id="send-button" type="submit">Enviar</button>
+            </form>
+        </fieldset>
+    </div>
+</div>
+
+<script>
+    const messagesContainer = document.getElementById('messages');
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    scrollToBottom();
+
+    // AJAX Polling para atualizar as mensagens (nenhuma mudança necessária aqui)
+    setInterval(function() {
+        fetch('/messages')
+            .then(response => response.json())
+            .then(data => {
+                const lastMessage = messagesContainer.lastElementChild ? messagesContainer.lastElementChild.textContent : null;
+                const lastNewMessage = data.length > 0 ? data[data.length-1] : null;
+
+                if (messagesContainer.childElementCount !== data.length || lastMessage !== lastNewMessage) {
+                    messagesContainer.innerHTML = '';
+                    data.forEach(msg => {
+                        const li = document.createElement('li');
+                        li.textContent = msg;
+                        messagesContainer.appendChild(li);
+                    });
+                    scrollToBottom();
+                }
+            });
+    }, 2000);
+</script>
+
+</body>
+</html>

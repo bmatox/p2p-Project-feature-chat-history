@@ -1,0 +1,7 @@
+org\unifor\p2p\PeerIdentity.class
+org\unifor\controller\ChatController.class
+org\unifor\Main.class
+org\unifor\service\ChatService.class
+org\unifor\p2p\Peer$PeerConnection.class
+org\unifor\p2p\Peer.class
+org\unifor\p2p\ChatHistory.class

@@ -1,0 +1,2 @@
+[Peer_1]: oi
+[Peer_1]: mensagem do peer1 para peer2
