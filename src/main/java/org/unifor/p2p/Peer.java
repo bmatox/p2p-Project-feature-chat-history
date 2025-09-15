@@ -4,65 +4,155 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/**
- * Representa um nó (peer) na rede P2P. Desacoplado do console para integração web.
- */
 public class Peer {
     private final String userName;
     private final String peerId;
+    private final int tcpPort; // A porta para o chat (TCP)
     private final ServerSocket serverSocket;
-    private final ChatHistory history;
     private final Consumer<String> onMessageCallback;
+    private final ChatHistory history;
     private final List<PeerConnection> connections = new CopyOnWriteArrayList<>();
 
+    // NOVO: Configurações para a descoberta via UDP Multicast
+    private MulticastSocket multicastSocket;
+    private static final String MULTICAST_GROUP = "230.0.0.0";
+    private static final int MULTICAST_PORT = 4446; // Porta para "anúncios" (UDP)
+
     public Peer(String userName, int port, Consumer<String> onMessageCallback) throws IOException {
+        this.userName = userName;
+        this.tcpPort = port;
+        this.onMessageCallback = onMessageCallback;
+
         String id = PeerIdentity.getPeerId(userName);
         if (id == null) {
             id = PeerIdentity.createPeerId(userName);
-            System.out.println("[INFO] Novo ID criado para " + userName + ": " + id);
-        } else {
-            System.out.println("[INFO] ID existente encontrado para " + userName + ": " + id);
         }
         this.peerId = id;
-        this.userName = userName;
-        this.onMessageCallback = onMessageCallback;
+        this.history = new ChatHistory(peerId);
 
         try {
-            this.serverSocket = new ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"));
-            this.history = new ChatHistory(peerId);
-            System.out.println("[INFO] Peer '" + userName + "' está ouvindo na porta " + port);
+            // Inicia o servidor TCP para o chat
+            this.serverSocket = new ServerSocket(this.tcpPort, 50, InetAddress.getByName("0.0.0.0"));
+            System.out.println("[INFO] Peer '" + userName + "' está ouvindo para chat na porta TCP " + this.tcpPort);
+
+            // NOVO: Inicia o socket UDP para descoberta de peers
+            this.multicastSocket = new MulticastSocket(MULTICAST_PORT);
+            InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
+            this.multicastSocket.joinGroup(group);
+            System.out.println("[INFO] Juntou-se ao grupo de descoberta em " + MULTICAST_GROUP + ":" + MULTICAST_PORT);
+
         } catch (IOException e) {
-            System.err.println("[ERRO CRÍTICO] Não foi possível ouvir na porta " + port + ". Ela pode já estar em uso.");
+            System.err.println("[ERRO CRÍTICO] Falha ao iniciar sockets: " + e.getMessage());
             throw e;
         }
     }
 
     public void start() {
-        new Thread(this::listenForConnections).start();
+        // Inicia a thread para ouvir conexões de chat (TCP)
+        new Thread(this::listenForTcpConnections).start();
+        // NOVO: Inicia a thread para ouvir "anúncios" de descoberta (UDP)
+        new Thread(this::listenForDiscoveryPackets).start();
     }
 
-    private void listenForConnections() {
-        while (true) {
+    // --- LÓGICA DE DESCOBERTA (PONTO 6) ---
+
+    private void listenForDiscoveryPackets() {
+        byte[] buf = new byte[256];
+        while (multicastSocket != null && !multicastSocket.isClosed()) {
+            try {
+                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                multicastSocket.receive(packet); // Espera por um "anúncio"
+
+                String received = new String(packet.getData(), 0, packet.getLength());
+                // Formato do anúncio: "DISCOVER:tcpPort:username"
+                if (received.startsWith("DISCOVER:")) {
+                    String[] parts = received.split(":", 3);
+                    int peerTcpPort = Integer.parseInt(parts[1]);
+                    InetAddress peerAddress = packet.getAddress();
+
+                    if (!isSelf(peerAddress, peerTcpPort) && !isAlreadyConnected(peerAddress, peerTcpPort)) {
+                        String peerUserName = parts[2];
+                        System.out.println("[DESCOBERTA] Peer '" + peerUserName + "' encontrado em " + peerAddress.getHostAddress() + ":" + peerTcpPort);
+                        onMessageCallback.accept("[SISTEMA] Peer '" + peerUserName + "' encontrado! Tentando conectar...");
+                        // Conecta-se automaticamente ao peer descoberto
+                        connectToPeer(peerAddress.getHostAddress(), peerTcpPort);
+                    }
+                }
+            } catch (IOException e) {
+                if (!multicastSocket.isClosed()) System.err.println("[ERRO] Falha ao receber pacote de descoberta.");
+            }
+        }
+    }
+
+    /**
+     * Envia um "anúncio" para a rede, avisando sobre sua presença.
+     */
+    public void broadcastDiscoveryPacket() {
+        try {
+            String message = "DISCOVER:" + this.tcpPort + ":" + this.userName;
+            byte[] buf = message.getBytes();
+            InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, MULTICAST_PORT);
+            multicastSocket.send(packet);
+            System.out.println("[INFO] Pacote de descoberta enviado para a rede.");
+        } catch (IOException e) {
+            System.err.println("[ERRO] Falha ao enviar pacote de descoberta: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Método robusto para verificar se o pacote recebido veio do próprio peer,
+     * checando contra todas as interfaces de rede locais.
+     */
+    private boolean isSelf(InetAddress address, int port) {
+        if (port != this.tcpPort) {
+            return false;
+        }
+        try {
+            for (NetworkInterface networkInterface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                for (InetAddress inetAddress : Collections.list(networkInterface.getInetAddresses())) {
+                    if (inetAddress.equals(address)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            System.err.println("[ERRO] Não foi possível verificar os endereços de rede locais.");
+        }
+        return false;
+    }
+
+    private boolean isAlreadyConnected(InetAddress address, int port) {
+        for (PeerConnection pc : connections) {
+            if (pc.socket.getInetAddress().equals(address) && pc.socket.getPort() == port) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- O RESTO DA CLASSE (LÓGICA DE CHAT TCP) ---
+    // A maioria dos métodos abaixo permanece como estava, com pequenas adições de feedback.
+
+    private void listenForTcpConnections() {
+        while (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 Socket socket = serverSocket.accept();
                 PeerConnection pc = new PeerConnection(socket);
                 connections.add(pc);
-
-                // ALTERAÇÃO: Notifica a interface sobre a nova conexão recebida.
                 String statusMessage = "[SISTEMA] Nova conexão recebida de " + socket.getRemoteSocketAddress();
-                System.out.println(statusMessage); // Mantém o log no console
-                onMessageCallback.accept(statusMessage); // Envia para a UI
-
+                System.out.println(statusMessage);
+                onMessageCallback.accept(statusMessage);
                 new Thread(() -> handleConnection(pc)).start();
             } catch (IOException e) {
-                System.err.println("[ERRO] Falha ao aceitar nova conexão: " + e.getMessage());
+                if (!serverSocket.isClosed())
+                    System.err.println("[ERRO] Falha ao aceitar nova conexão de chat: " + e.getMessage());
             }
         }
     }
@@ -90,16 +180,13 @@ public class Peer {
                 history.saveMessage(pc.remotePeerId, message);
             }
         } catch (IOException e) {
-            System.out.println("[AVISO] Conexão com " + pc.socket.getRemoteSocketAddress() + " foi perdida.");
+            // Acontece quando o outro peer se desconecta
         } finally {
             connections.remove(pc);
-
-            // ALTERAÇÃO: Notifica a interface sobre a desconexão.
             String statusMessage = "[SISTEMA] Conexão com " + pc.socket.getRemoteSocketAddress() + " foi encerrada.";
-            System.out.println(statusMessage); // Mantém o log no console
-            onMessageCallback.accept(statusMessage); // Envia para a UI
-
-            pc.close(); // Fecha os recursos da conexão
+            System.out.println(statusMessage);
+            onMessageCallback.accept(statusMessage);
+            pc.close();
         }
     }
 
@@ -114,9 +201,6 @@ public class Peer {
         }
     }
 
-    /**
-     * ALTERAÇÃO: O método agora retorna boolean para indicar sucesso ou falha.
-     */
     public boolean connectToPeer(String host, int port) {
         try {
             Socket socket = new Socket(host, port);
@@ -127,8 +211,6 @@ public class Peer {
             if (response != null && response.startsWith("/id:")) {
                 pc.remotePeerId = response.substring(4).trim();
                 System.out.println("[INFO] Recebido peerId remoto: " + pc.remotePeerId);
-            } else {
-                System.out.println("[WARN] Não recebeu peerId do remoto.");
             }
 
             connections.add(pc);
@@ -141,19 +223,14 @@ public class Peer {
                     onMessageCallback.accept("[SISTEMA] ---- Fim do histórico ----");
                 }
             }
-
             new Thread(() -> handleConnection(pc)).start();
-            System.out.println("[INFO] Conectado com sucesso ao peer em " + host + ":" + port);
-            return true; // Retorna true em caso de sucesso
+            return true;
         } catch (IOException e) {
             System.err.println("[ERRO] Falha ao conectar ao peer " + host + ":" + port + ". Motivo: " + e.getMessage());
-            return false; // Retorna false em caso de falha
+            return false;
         }
     }
 
-    /**
-     * ALTERAÇÃO: A classe interna agora tem um método para fechar seus recursos.
-     */
     private static class PeerConnection {
         Socket socket;
         BufferedReader in;
@@ -172,7 +249,7 @@ public class Peer {
                 if (out != null) out.close();
                 if (socket != null && !socket.isClosed()) socket.close();
             } catch (IOException e) {
-                // Erros ao fechar são geralmente ignorados
+                // Silencioso
             }
         }
     }

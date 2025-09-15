@@ -48,6 +48,17 @@ public class ChatController {
     }
 
     /**
+     * NOVO: Endpoint para iniciar a descoberta de peers na rede.
+     */
+    @PostMapping("/discover")
+    public String discoverPeers(RedirectAttributes redirectAttributes) {
+        chatService.triggerDiscovery();
+        redirectAttributes.addFlashAttribute("feedbackMessage", "🔎 Sinal de descoberta enviado para a rede!");
+        redirectAttributes.addFlashAttribute("feedbackType", "success");
+        return "redirect:/";
+    }
+
+    /**
      * ALTERADO: Recebe a requisição para conectar, agora com feedback para a UI.
      * @param host O IP do peer de destino.
      * @param port A porta do peer de destino.

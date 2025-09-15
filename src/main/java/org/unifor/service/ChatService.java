@@ -35,6 +35,15 @@ public class ChatService {
     }
 
     /**
+     * NOVO: Inicia o processo de descoberta de peers na rede.
+     */
+    public void triggerDiscovery() {
+        if (peer != null) {
+            peer.broadcastDiscoveryPacket();
+        }
+    }
+
+    /**
      * Método chamado pelo Peer sempre que uma nova mensagem (chat ou status) é recebida.
      */
     public void onMessageReceived(String message) {

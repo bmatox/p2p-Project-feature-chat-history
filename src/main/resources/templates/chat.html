@@ -11,12 +11,11 @@
         #messages li { padding: 8px 12px; margin-bottom: 5px; border-radius: 5px; background-color: #e9e9e9; word-wrap: break-word; }
         .form-group { display: flex; gap: 10px; }
         .form-group input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        .form-group button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 5px; cursor: pointer; }
-        .form-group button:hover { background-color: #0056b3; }
+        .form-group button, .full-width-button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 5px; cursor: pointer; }
+        .form-group button:hover, .full-width-button:hover { background-color: #0056b3; }
         fieldset { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
         legend { font-weight: bold; color: #555; }
 
-        /* ALTERAÇÃO: Adicionado estilo para os painéis de feedback (Flash Messages) */
         .feedback-panel {
             padding: 15px;
             margin-bottom: 20px;
@@ -34,7 +33,6 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-
     </style>
 </head>
 <body>
@@ -42,11 +40,18 @@
 <div class="container">
     <div class="panel">
         <fieldset>
-            <legend>Conectar a um Novo Peer</legend>
+            <legend>Conectar a um Peer</legend>
+
+            <form th:action="@{/discover}" method="post" style="margin-bottom: 10px;">
+                <button type="submit" class="full-width-button" style="width: 100%; background-color: #28a745;">🔎 Procurar Peers na Rede</button>
+            </form>
+
+            <p style="text-align: center; margin: 15px 0; color: #888;">— OU —</p>
+
             <form th:action="@{/connect}" method="post" class="form-group">
                 <input type="text" name="host" placeholder="Endereço IP (host)" required />
                 <input type="text" name="port" placeholder="Porta" required />
-                <button type="submit">Conectar</button>
+                <button type="submit">Conectar Manualmente</button>
             </form>
         </fieldset>
     </div>
@@ -79,7 +84,7 @@
     }
     scrollToBottom();
 
-    // AJAX Polling para atualizar as mensagens (nenhuma mudança necessária aqui)
+    // AJAX Polling para atualizar as mensagens
     setInterval(function() {
         fetch('/messages')
             .then(response => response.json())
@@ -97,7 +102,7 @@
                     scrollToBottom();
                 }
             });
-    }, 2000);
+    }, 2000); // 2 segundos
 </script>
 
 </body>
