@@ -166,7 +166,6 @@ Conteúdo de exemplo:
 5. **Persistência simples**: gravação em arquivos é suficiente para demo, mas não é transacional nem indexada.
 6. **Ordenação / entrega**: sem garantias avançadas (retries, ACKs, ordenação global) — depende da ordem de chegada do TCP e do gerenciamento de conexões.
 7. **UI: Polling**: atualizações da UI usam polling AJAX; para melhor UX seria ideal usar WebSocket para push em tempo real.
-
 ---
 
 ## 7. Sugestões de melhorias / próximos passos
@@ -178,7 +177,7 @@ Conteúdo de exemplo:
 * Migrar histórico para um banco leve (SQLite, H2) para consultas e integridade.
 * Suporte a múltiplas salas, mensagens privadas com metadata (timestamp, id, delivery status).
 * Testes automatizados (unit e integração) para as classes P2P (simular pares, conexões e falhas).
-
+* Inserir elementos de UI, como botões para conectar e desconectar de um chat e inserir um botão para atualizar a lista de peers na rede.
 ---
 
 ## 8. Logs / Debug
