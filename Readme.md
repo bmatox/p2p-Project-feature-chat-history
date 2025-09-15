@@ -166,6 +166,15 @@ Conteúdo de exemplo:
 5. **Persistência simples**: gravação em arquivos é suficiente para demo, mas não é transacional nem indexada.
 6. **Ordenação / entrega**: sem garantias avançadas (retries, ACKs, ordenação global) — depende da ordem de chegada do TCP e do gerenciamento de conexões.
 7. **UI: Polling**: atualizações da UI usam polling AJAX; para melhor UX seria ideal usar WebSocket para push em tempo real.
+8. **Múltiplas inserções de dados: devido à concorrência de threads, tivemos problemas em inserir os dados de endereço e porta de outro peer, sendo necessário inserir diversas vezes uma mesma informação para poder inserir a próxima. Ex: ao inserir um endereço de um peer, era necessário inserir novamente o mesmo endereço para o sistema solicitar a porta. Este problema foi resolvido.
+9. **Identificador único: ao criarmos o histórico de chat  dos usuários, decidimos criar arquivos de texto para armazenar as conversas, identificando-os com o nome dos usuários participantes. 
+Ex: uma conversa entre Bob e Alice teria um arquivo de texto nomeado bob_alice.txt, contendo as conversas de ambos.
+Notamos alguns problemas com essa abordagem:
+         1. A medida que novos usuários entram na conversa, o identificador do arquivo de texto aumentava consideravelmente               por conta da inserção do nome de novos integrantes no identificador.
+         2. Caso o usuário converse com um usuário que ele já tenha conversado, o histórico de chat existente será 
+            sobreescrevido.
+Este problema foi solucionado utilizando a classe UUID que permite criar um indentificador único composto por 36 caracteres hexadecimais.
+
 ---
 
 ## 7. Sugestões de melhorias / próximos passos
