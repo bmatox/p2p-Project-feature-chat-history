@@ -170,10 +170,9 @@ Conteúdo de exemplo:
 9. **Identificador único: ao criarmos o histórico de chat  dos usuários, decidimos criar arquivos de texto para armazenar as conversas, identificando-os com o nome dos usuários participantes. 
 Ex: uma conversa entre Bob e Alice teria um arquivo de texto nomeado bob_alice.txt, contendo as conversas de ambos.
 Notamos alguns problemas com essa abordagem:
-         1. A medida que novos usuários entram na conversa, o identificador do arquivo de texto aumentava consideravelmente               por conta da inserção do nome de novos integrantes no identificador.
-         2. Caso o usuário converse com um usuário que ele já tenha conversado, o histórico de chat existente será 
-            sobreescrevido.
-Este problema foi solucionado utilizando a classe UUID que permite criar um indentificador único composto por 36 caracteres hexadecimais.
+9.1 A medida que novos usuários entram na conversa, o identificador do arquivo de texto aumentava consideravelmente           por conta da inserção do nome de novos integrantes no identificador.
+9.2 Caso o usuário converse com um usuário que ele já tenha conversado, o histórico de chat existente será sobreescrevido.
+Estes problemas foram solucionados utilizando a classe UUID que permite criar um indentificador único composto por 36 caracteres hexadecimais.
 
 ---
 
